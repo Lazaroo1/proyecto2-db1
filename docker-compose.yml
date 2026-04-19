@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15
+    container_name: db_proyecto2
+    restart: always
+    environment:
+      POSTGRES_USER: proy2
+      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: tienda
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./db:/docker-entrypoint-initdb.d
+
+  backend:
+    build: ./backend
+    container_name: backend_proyecto2
+    restart: always
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    depends_on:
+      - db
+
+  frontend:
+    build: ./frontend
+    container_name: frontend_proyecto2
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
