@@ -1,14 +1,12 @@
-version: '3.8'
-
 services:
   db:
     image: postgres:15
     container_name: db_proyecto2
     restart: always
     environment:
-      POSTGRES_USER: proy2
-      POSTGRES_PASSWORD: secret
-      POSTGRES_DB: tienda
+      POSTGRES_USER: ${DB_USER:-proy2}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-secret}
+      POSTGRES_DB: ${DB_NAME:-tienda}
     ports:
       - "5432:5432"
     volumes:
@@ -22,6 +20,13 @@ services:
       - "3000:3000"
     env_file:
       - .env
+    environment:
+      PORT: ${PORT:-3000}
+      DB_USER: ${DB_USER:-proy2}
+      DB_PASSWORD: ${DB_PASSWORD:-secret}
+      DB_NAME: ${DB_NAME:-tienda}
+      DB_HOST: ${DB_HOST:-db}
+      DB_PORT: ${DB_PORT:-5432}
     depends_on:
       - db
 
