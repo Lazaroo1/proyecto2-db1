@@ -32,6 +32,11 @@ const initialSaleForm = {
   quantity: 1,
 }
 
+const initialLoginForm = {
+  username: '',
+  password: '',
+}
+
 function formatCurrency(value) {
   const number = Number(value)
   if (Number.isNaN(number)) {
@@ -55,12 +60,22 @@ function formatCellValue(columnKey, value) {
   return value
 }
 
-async function fetchJson(path, options) {
-  const response = await fetch(`${API_BASE}${path}`, options)
-  const payload = await response.json()
+async function fetchJson(path, options = {}) {
+  const response = await fetch(`${API_BASE}${path}`, {
+    credentials: 'include',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(options.headers ?? {}),
+    },
+  })
+
+  const payload = await response.json().catch(() => ({}))
 
   if (!response.ok) {
-    throw new Error(payload.error || 'La solicitud no se pudo completar.')
+    const error = new Error(payload.error || 'La solicitud no se pudo completar.')
+    error.status = response.status
+    throw error
   }
 
   return payload
@@ -96,6 +111,14 @@ function DataTable({ columns, rows }) {
 }
 
 function App() {
+  const [authStatus, setAuthStatus] = useState('checking')
+  const [user, setUser] = useState(null)
+  const [loginForm, setLoginForm] = useState(initialLoginForm)
+  const [loginFeedback, setLoginFeedback] = useState(null)
+  const [loggingIn, setLoggingIn] = useState(false)
+  const [loggingOut, setLoggingOut] = useState(false)
+  const [downloadingPdf, setDownloadingPdf] = useState(false)
+
   const [sections, setSections] = useState([])
   const [generatedAt, setGeneratedAt] = useState('')
   const [report, setReport] = useState({
@@ -147,14 +170,46 @@ function App() {
       setProducts(productsData)
       setReport(reportData)
     } catch (loadError) {
-      setError(loadError.message)
+      if (loadError.status === 401) {
+        setAuthStatus('unauthenticated')
+        setUser(null)
+        setLoginFeedback({
+          type: 'error',
+          message: 'Tu sesion expiro. Vuelve a iniciar sesion.',
+        })
+      } else {
+        setError(loadError.message)
+      }
     } finally {
       setLoading(false)
     }
   }
 
+  async function bootstrapSession() {
+    setAuthStatus('checking')
+
+    try {
+      const payload = await fetchJson('/api/auth/me', {
+        headers: {},
+      })
+      setUser(payload.user)
+      setAuthStatus('authenticated')
+      await loadAppData()
+    } catch (sessionError) {
+      if (sessionError.status === 401) {
+        setAuthStatus('unauthenticated')
+        setUser(null)
+        setLoading(false)
+      } else {
+        setAuthStatus('unauthenticated')
+        setError(sessionError.message)
+        setLoading(false)
+      }
+    }
+  }
+
   useEffect(() => {
-    loadAppData()
+    bootstrapSession()
   }, [])
 
   useEffect(() => {
@@ -209,6 +264,14 @@ function App() {
     })
   }
 
+  function handleLoginFieldChange(event) {
+    const { name, value } = event.target
+    setLoginForm((currentForm) => ({
+      ...currentForm,
+      [name]: value,
+    }))
+  }
+
   function handleClientFieldChange(event) {
     const { name, value } = event.target
     setClientForm((currentForm) => ({
@@ -233,6 +296,104 @@ function App() {
     }))
   }
 
+  async function handleLoginSubmit(event) {
+    event.preventDefault()
+    setLoggingIn(true)
+    setLoginFeedback(null)
+
+    if (!loginForm.username.trim() || !loginForm.password.trim()) {
+      setLoginFeedback({
+        type: 'error',
+        message: 'Debes ingresar usuario y contraseña.',
+      })
+      setLoggingIn(false)
+      return
+    }
+
+    try {
+      const payload = await fetchJson('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify(loginForm),
+      })
+
+      setUser(payload.user)
+      setAuthStatus('authenticated')
+      setLoginForm(initialLoginForm)
+      setLoginFeedback({
+        type: 'success',
+        message: `Bienvenido, ${payload.user.nombreMostrar}.`,
+      })
+      await loadAppData()
+    } catch (loginError) {
+      setLoginFeedback({
+        type: 'error',
+        message: loginError.message,
+      })
+      setAuthStatus('unauthenticated')
+    } finally {
+      setLoggingIn(false)
+    }
+  }
+
+  async function handleLogout() {
+    setLoggingOut(true)
+
+    try {
+      await fetchJson('/api/auth/logout', {
+        method: 'POST',
+        headers: {},
+      })
+    } catch (logoutError) {
+      console.error(logoutError)
+    } finally {
+      setLoggingOut(false)
+      setAuthStatus('unauthenticated')
+      setUser(null)
+      setSections([])
+      setReport({ metrics: null, topCategories: [], recentSales: [] })
+      setClients([])
+      setProducts([])
+    }
+  }
+
+  async function handleExportPdf() {
+    setDownloadingPdf(true)
+    setError('')
+
+    try {
+      const response = await fetch(`${API_BASE}/api/reports/overview/pdf`, {
+        method: 'GET',
+        credentials: 'include',
+      })
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}))
+        const error = new Error(payload.error || 'No se pudo exportar el PDF.')
+        error.status = response.status
+        throw error
+      }
+
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'reporte-ejecutivo-tienda.pdf'
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (pdfError) {
+      if (pdfError.status === 401) {
+        setAuthStatus('unauthenticated')
+        setUser(null)
+      } else {
+        setError(pdfError.message)
+      }
+    } finally {
+      setDownloadingPdf(false)
+    }
+  }
+
   async function handleSubmitSale(event) {
     event.preventDefault()
     setSubmittingSale(true)
@@ -241,7 +402,6 @@ function App() {
     try {
       const payload = await fetchJson('/api/transactions/sales', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           clientId: Number(saleForm.clientId),
           employeeId: Number(saleForm.employeeId),
@@ -295,7 +455,6 @@ function App() {
         isEditing ? `/api/clients/${clientForm.id}` : '/api/clients',
         {
           method: isEditing ? 'PUT' : 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             nombre: clientForm.nombre,
             apellido: clientForm.apellido,
@@ -353,7 +512,6 @@ function App() {
         isEditing ? `/api/products/${productForm.id}` : '/api/products',
         {
           method: isEditing ? 'PUT' : 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             nombre: productForm.nombre,
             precio: Number(productForm.precio),
@@ -414,6 +572,7 @@ function App() {
     try {
       const payload = await fetchJson(`/api/clients/${client.id_cliente}`, {
         method: 'DELETE',
+        headers: {},
       })
 
       setClientFeedback({ type: 'success', message: payload.message })
@@ -437,6 +596,7 @@ function App() {
     try {
       const payload = await fetchJson(`/api/products/${product.id_producto}`, {
         method: 'DELETE',
+        headers: {},
       })
 
       setProductFeedback({ type: 'success', message: payload.message })
@@ -483,20 +643,94 @@ function App() {
     return accumulator
   }, {})
 
+  if (authStatus === 'checking') {
+    return (
+      <div className="auth-shell">
+        <article className="auth-card">
+          <p className="eyebrow">Verificando sesion</p>
+          <h1>Cargando panel de la tienda...</h1>
+          <p className="hero-text">Estamos comprobando si ya tienes una sesion activa.</p>
+        </article>
+      </div>
+    )
+  }
+
+  if (authStatus === 'unauthenticated') {
+    return (
+      <div className="auth-shell">
+        <article className="auth-card">
+          <p className="eyebrow">Acceso protegido</p>
+          <h1>Inicio de sesión </h1>
+          <p className="hero-text">
+            Esta version incluye autenticacion con login/logout y sesion persistida por
+            cookie HttpOnly.
+          </p>
+
+          <form className="login-form" onSubmit={handleLoginSubmit}>
+            <label className="field">
+              <span>Usuario</span>
+              <input
+                name="username"
+                type="text"
+                value={loginForm.username}
+                onChange={handleLoginFieldChange}
+                required
+              />
+            </label>
+
+            <label className="field">
+              <span>Contraseña</span>
+              <input
+                name="password"
+                type="password"
+                value={loginForm.password}
+                onChange={handleLoginFieldChange}
+                required
+              />
+            </label>
+
+            <button className="primary-btn" disabled={loggingIn} type="submit">
+              {loggingIn ? 'Entrando...' : 'Iniciar sesion'}
+            </button>
+          </form>
+
+          {loginFeedback ? (
+            <div className={`status-banner ${loginFeedback.type}`}>{loginFeedback.message}</div>
+          ) : null}
+
+          <div className="demo-credentials">
+            <h3>Credenciales de prueba</h3>
+            <p>
+              <strong>Usuario:</strong> <code>admin</code>
+            </p>
+            <p>
+              <strong>Contraseña:</strong> <code>tienda2026</code>
+            </p>
+            <p className="hint">También funcionan: "ventas" e "inventario" con la misma contraseña</p>
+          </div>
+        </article>
+      </div>
+    )
+  }
+
   return (
     <div className="app-shell">
       <header className="hero-panel">
         <div className="hero-copy">
-          <p className="eyebrow">Proyecto 2 DB1</p>
-          <h1>Inventario, ventas y panel completo de administracion</h1>
+          <p className="eyebrow">Proyecto 2 DB1 - Lázaro Díaz 24713</p>
+          <h1>Inventario, ventas y reportes exportables</h1>
           <p className="hero-text">
-            Esta interfaz combina CRUD de clientes y productos, reportes visibles, manejo de
-            errores para el usuario y el dashboard SQL de la rubrica, todo conectado a PostgreSQL
-            desde React y Node.js.
+            Esta interfaz incluye autenticación con login/logout y sesion, exportacion del
+            reporte ejecutivo a PDF, CRUD de clientes y productos, y el dashboard SQL completo.
           </p>
         </div>
 
         <div className="hero-meta">
+          <div className="meta-chip user-chip">
+            <span>Sesion activa</span>
+            <strong>{user?.nombreMostrar}</strong>
+            <small>{user?.username} · {user?.cargo}</small>
+          </div>
           <div className="meta-chip">
             <span>Consultas SQL visibles</span>
             <strong>{sections.length}</strong>
@@ -505,20 +739,31 @@ function App() {
             <span>Ultima carga</span>
             <strong>{generatedAt ? new Date(generatedAt).toLocaleString('es-GT') : 'Pendiente'}</strong>
           </div>
-          <button className="secondary-btn" type="button" onClick={() => loadAppData()}>
-            Recargar aplicacion
-          </button>
+          <div className="top-actions">
+            <button className="secondary-btn" type="button" onClick={() => loadAppData()}>
+              Recargar aplicacion
+            </button>
+            <button className="ghost-btn" disabled={loggingOut} type="button" onClick={handleLogout}>
+              {loggingOut ? 'Saliendo...' : 'Cerrar sesión'}
+            </button>
+          </div>
         </div>
       </header>
 
       <section className="report-panel">
-        <div className="section-heading">
-          <span className="pill pill-report">REPORTE</span>
-          <h2>Reporte ejecutivo con datos reales</h2>
-          <p>
-            Este reporte se alimenta desde la base de datos y resume inventario, clientes, ventas
-            del mes, categorias mas rentables y ventas recientes.
-          </p>
+        <div className="section-heading report-heading">
+          <div>
+            <span className="pill pill-report">REPORTE</span>
+            <h2>Reporte ejecutivo con datos reales</h2>
+            <p>
+              Este reporte se alimenta desde la base de datos y ahora puede exportarse a PDF
+              directamente desde la interfaz.
+            </p>
+          </div>
+
+          <button className="primary-btn" disabled={downloadingPdf} type="button" onClick={handleExportPdf}>
+            {downloadingPdf ? 'Generando PDF...' : 'Exportar reporte a PDF'}
+          </button>
         </div>
 
         <div className="summary-grid">

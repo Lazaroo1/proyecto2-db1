@@ -44,6 +44,16 @@ CREATE TABLE empleado (
     salario DECIMAL(10,2)
 );
 
+-- USUARIO
+CREATE TABLE usuario (
+    id_usuario SERIAL PRIMARY KEY,
+    username VARCHAR(50) NOT NULL UNIQUE,
+    password_hash VARCHAR(64) NOT NULL,
+    nombre_mostrar VARCHAR(120) NOT NULL,
+    id_empleado INT,
+    FOREIGN KEY (id_empleado) REFERENCES empleado(id_empleado)
+);
+
 -- VENTA
 CREATE TABLE venta (
     id_venta SERIAL PRIMARY KEY,
@@ -79,3 +89,8 @@ JOIN cliente c ON c.id_cliente = v.id_cliente
 JOIN empleado e ON e.id_empleado = v.id_empleado
 JOIN detalle_venta dv ON dv.id_venta = v.id_venta
 GROUP BY v.id_venta, v.fecha, c.nombre, c.apellido, e.nombre, e.apellido;
+
+-- INDICES EXPLICITOS
+CREATE INDEX idx_producto_id_categoria ON producto(id_categoria);
+CREATE INDEX idx_venta_fecha ON venta(fecha);
+CREATE INDEX idx_detalle_venta_id_venta ON detalle_venta(id_venta);

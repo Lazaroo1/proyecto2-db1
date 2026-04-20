@@ -1,5 +1,5 @@
 BEGIN;
-TRUNCATE TABLE detalle_venta, venta, producto, cliente, empleado, proveedor, categoria RESTART IDENTITY CASCADE;
+TRUNCATE TABLE detalle_venta, venta, producto, usuario, cliente, empleado, proveedor, categoria RESTART IDENTITY CASCADE;
 -- categoria
 INSERT INTO categoria (nombre, descripcion) VALUES
 ('Electronics', 'Smartphones, computers, cameras, and consumer technology devices.'),
@@ -139,6 +139,12 @@ INSERT INTO empleado (nombre, apellido, cargo, salario) VALUES
 ('Raul', 'Escobar', 'Soporte tecnico', 6200.00),
 ('Sofia', 'Barrios', 'Compradora junior', 4800.00),
 ('Ivan', 'Rosales', 'Prevencion de perdidas', 4700.00);
+
+-- usuario
+INSERT INTO usuario (username, password_hash, nombre_mostrar, id_empleado) VALUES
+('admin', '3e01f3708b4dda9da8b984bcd792618d6b81d88aa1182e3ba87212ada3e341c8', 'Administrador general', (SELECT id_empleado FROM empleado WHERE nombre = 'Carlos' AND apellido = 'Mendoza')),
+('ventas', '3e01f3708b4dda9da8b984bcd792618d6b81d88aa1182e3ba87212ada3e341c8', 'Supervisor de ventas', (SELECT id_empleado FROM empleado WHERE nombre = 'Jose' AND apellido = 'Ramirez')),
+('inventario', '3e01f3708b4dda9da8b984bcd792618d6b81d88aa1182e3ba87212ada3e341c8', 'Coordinacion de inventario', (SELECT id_empleado FROM empleado WHERE nombre = 'Natalia' AND apellido = 'Gomez'));
 
 -- venta
 INSERT INTO venta (fecha, id_cliente, id_empleado) VALUES

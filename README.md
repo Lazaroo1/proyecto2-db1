@@ -17,7 +17,7 @@ Aplicacion web para gestionar inventario y ventas de una tienda usando:
 El proyecto usa las credenciales solicitadas en la rubrica:
 
 - Usuario de base de datos: `proy2`
-- Contrasena: `secret`
+- Contraseña: `secret`
 
 El repositorio incluye un archivo `.env.example`. Si no tienes `.env`, puedes crearlo con este contenido:
 
@@ -38,10 +38,17 @@ Desde la raiz del repositorio ejecutar:
 docker compose up --build
 ```
 
-Si ya había sido levantado antes y se desea reiniciar todo:
+Si ya se había levantado antes y se quiere reiniciar todo:
 
 ```bash
 docker compose down
+docker compose up --build
+```
+
+Si se cambia la estructura SQL y se quiere reinicializar la base desde cero:
+
+```bash
+docker compose down -v
 docker compose up --build
 ```
 
@@ -51,7 +58,17 @@ docker compose up --build
 - Backend: `http://localhost:3000`
 - Health check: `http://localhost:3000/api/health`
 
-## Que incluye la aplicacion
+## Credenciales de autenticacion
+
+La aplicacion incluye login/logout con sesión basada en cookie HttpOnly.
+
+Usuarios de prueba:
+
+- `admin` / `tienda2026`
+- `ventas` / `tienda2026`
+- `inventario` / `tienda2026`
+
+## Funcionalidades principales
 
 ### 1. CRUD completo en la interfaz
 
@@ -84,7 +101,15 @@ La aplicacion muestra un reporte ejecutivo con datos reales de la base:
 - top categorias por ingresos
 - ventas recientes
 
-### 3. Consultas SQL visibles en la UI
+### 3. Exportacion de reporte a PDF
+
+Desde la UI puedes exportar el reporte ejecutivo a PDF con el boton:
+
+- `Exportar reporte a PDF`
+
+El PDF se genera desde el backend y se descarga directamente en el navegador.
+
+### 4. Consultas SQL visibles en la UI
 
 El dashboard incluye consultas ejecutadas desde la aplicacion web:
 
@@ -95,7 +120,7 @@ El dashboard incluye consultas ejecutadas desde la aplicacion web:
 - `VIEW`
 - transaccion explicita con `BEGIN / COMMIT / ROLLBACK`
 
-### 4. Transaccion de ventas
+### 5. Transaccion de ventas
 
 La seccion de ventas permite registrar una venta desde la UI. El backend:
 
@@ -105,6 +130,17 @@ La seccion de ventas permite registrar una venta desde la UI. El backend:
 4. hace `ROLLBACK` si ocurre un error
 
 Se puede probar el rollback intentando vender una cantidad mayor al stock disponible.
+
+## Flujo recomendado de prueba
+
+1. Iniciar sesion con `admin / tienda2026`
+2. Revisar el reporte ejecutivo
+3. Exportar el reporte a PDF
+4. Crear, editar y eliminar un cliente
+5. Crear, editar y eliminar un producto
+6. Prueba de una venta valida
+7. Prueba de una venta invalida con cantidad mayor al stock para demostrar `ROLLBACK`
+8. Revisar las consultas SQL visibles en el dashboard
 
 ## Archivos importantes
 
@@ -116,10 +152,5 @@ Se puede probar el rollback intentando vender una cantidad mayor al stock dispon
 
 ## Notas de uso
 
-- Si se realizan cambios en backend o frontend, se vuelve a ejecutar `docker compose up --build`.
-- Si se cambian scripts de inicializacion SQL y se quiere recargar la base desde cero, usar:
-
-```bash
-docker compose down -v
-docker compose up --build
-```
+- Si se hacen cambios en backend o frontend, vuelve a ejecutar `docker compose up --build`.
+- Si el navegador muestra una version anterior de la app, haz un hard refresh con `Ctrl + F5`.

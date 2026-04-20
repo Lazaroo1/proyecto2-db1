@@ -4,9 +4,9 @@ services:
     container_name: db_proyecto2
     restart: always
     environment:
-      POSTGRES_USER: ${DB_USER:-proy2}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-secret}
-      POSTGRES_DB: ${DB_NAME:-tienda}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
     ports:
       - "5432:5432"
     volumes:
@@ -23,11 +23,11 @@ services:
       - .env
     environment:
       PORT: ${PORT:-3000}
-      DB_USER: ${DB_USER:-proy2}
-      DB_PASSWORD: ${DB_PASSWORD:-secret}
-      DB_NAME: ${DB_NAME:-tienda}
-      DB_HOST: ${DB_HOST:-db}
-      DB_PORT: ${DB_PORT:-5432}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
     depends_on:
       - db
 

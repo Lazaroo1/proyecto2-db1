@@ -1,21 +1,31 @@
 const express = require("express");
 const { Pool } = require("pg");
 const cors = require("cors");
+const crypto = require("crypto");
 
 require("dotenv").config();
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
+const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "http://localhost:5173";
+const SESSION_COOKIE_NAME = "store_session";
+const SESSION_DURATION_MS = 1000 * 60 * 60 * 8;
+const sessions = new Map();
 
-app.use(cors());
+app.use(
+  cors({
+    origin: FRONTEND_ORIGIN,
+    credentials: true,
+  })
+);
 app.use(express.json());
 
 const pool = new Pool({
-  user: process.env.DB_USER || "proy2",
-  host: process.env.DB_HOST || "db",
-  database: process.env.DB_NAME || "tienda",
-  password: process.env.DB_PASSWORD || "secret",
-  port: Number(process.env.DB_PORT) || 5432,
+  user: process.env.DB_USER,
+  host: process.env.DB_HOST,
+  database: process.env.DB_NAME,
+  password: process.env.DB_PASSWORD,
+  port: Number(process.env.DB_PORT),
 });
 
 const viewSql = `
@@ -308,6 +318,130 @@ function parseNonNegativeInteger(value, fieldName) {
   return parsed;
 }
 
+function sha256(value) {
+  return crypto.createHash("sha256").update(value).digest("hex");
+}
+
+function parseCookies(header = "") {
+  return header.split(";").reduce((accumulator, chunk) => {
+    const [rawKey, ...rawValue] = chunk.trim().split("=");
+
+    if (!rawKey) {
+      return accumulator;
+    }
+
+    accumulator[rawKey] = decodeURIComponent(rawValue.join("=") || "");
+    return accumulator;
+  }, {});
+}
+
+function setSessionCookie(res, sessionId) {
+  const maxAge = Math.floor(SESSION_DURATION_MS / 1000);
+  res.setHeader(
+    "Set-Cookie",
+    `${SESSION_COOKIE_NAME}=${sessionId}; HttpOnly; Path=/; Max-Age=${maxAge}; SameSite=Lax`
+  );
+}
+
+function clearSessionCookie(res) {
+  res.setHeader(
+    "Set-Cookie",
+    `${SESSION_COOKIE_NAME}=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax`
+  );
+}
+
+function createSession(user) {
+  const sessionId = crypto.randomBytes(32).toString("hex");
+  sessions.set(sessionId, {
+    user,
+    expiresAt: Date.now() + SESSION_DURATION_MS,
+  });
+  return sessionId;
+}
+
+function getSessionFromRequest(req) {
+  const cookies = parseCookies(req.headers.cookie || "");
+  const sessionId = cookies[SESSION_COOKIE_NAME];
+
+  if (!sessionId || !sessions.has(sessionId)) {
+    return null;
+  }
+
+  const session = sessions.get(sessionId);
+
+  if (session.expiresAt < Date.now()) {
+    sessions.delete(sessionId);
+    return null;
+  }
+
+  session.expiresAt = Date.now() + SESSION_DURATION_MS;
+  return {
+    sessionId,
+    session,
+  };
+}
+
+function requireAuth(req, res, next) {
+  const sessionData = getSessionFromRequest(req);
+
+  if (!sessionData) {
+    return res.status(401).json({
+      error: "Debes iniciar sesion para acceder a esta funcionalidad.",
+    });
+  }
+
+  req.sessionId = sessionData.sessionId;
+  req.user = sessionData.session.user;
+  setSessionCookie(res, sessionData.sessionId);
+  return next();
+}
+
+function escapePdfText(value) {
+  return String(value)
+    .replace(/\\/g, "\\\\")
+    .replace(/\(/g, "\\(")
+    .replace(/\)/g, "\\)");
+}
+
+function buildPdf(lines) {
+  const contentLines = ["BT", "/F1 12 Tf", "50 790 Td", "16 TL"];
+  lines.forEach((line, index) => {
+    if (index === 0) {
+      contentLines.push(`(${escapePdfText(line)}) Tj`);
+    } else {
+      contentLines.push(`T* (${escapePdfText(line)}) Tj`);
+    }
+  });
+  contentLines.push("ET");
+
+  const contentStream = contentLines.join("\n");
+  const objects = [
+    "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj",
+    "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj",
+    "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>\nendobj",
+    `4 0 obj\n<< /Length ${Buffer.byteLength(contentStream, "utf8")} >>\nstream\n${contentStream}\nendstream\nendobj`,
+    "5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj",
+  ];
+
+  let pdf = "%PDF-1.4\n";
+  const offsets = [0];
+
+  objects.forEach((object) => {
+    offsets.push(Buffer.byteLength(pdf, "utf8"));
+    pdf += `${object}\n`;
+  });
+
+  const xrefPosition = Buffer.byteLength(pdf, "utf8");
+  pdf += `xref\n0 ${objects.length + 1}\n`;
+  pdf += "0000000000 65535 f \n";
+  offsets.slice(1).forEach((offset) => {
+    pdf += `${String(offset).padStart(10, "0")} 00000 n \n`;
+  });
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefPosition}\n%%EOF`;
+
+  return Buffer.from(pdf, "utf8");
+}
+
 async function ensureViewExists() {
   await pool.query(viewSql);
 }
@@ -502,6 +636,84 @@ app.get("/api/health", async (req, res) => {
   }
 });
 
+app.post("/api/auth/login", async (req, res) => {
+  try {
+    const username = normalizeText(req.body.username);
+    const password = normalizeText(req.body.password);
+
+    if (!username || !password) {
+      throw createHttpError(400, "Debes ingresar usuario y contraseña.");
+    }
+
+    const result = await pool.query(
+      `
+        SELECT
+          u.id_usuario,
+          u.username,
+          u.password_hash,
+          u.nombre_mostrar,
+          e.cargo
+        FROM usuario u
+        LEFT JOIN empleado e ON e.id_empleado = u.id_empleado
+        WHERE u.username = $1;
+      `,
+      [username]
+    );
+
+    if (result.rowCount === 0) {
+      throw createHttpError(401, "Credenciales invalidas.");
+    }
+
+    const user = result.rows[0];
+    const incomingHash = sha256(password);
+
+    if (incomingHash !== user.password_hash) {
+      throw createHttpError(401, "Credenciales invalidas.");
+    }
+
+    const sessionId = createSession({
+      idUsuario: user.id_usuario,
+      username: user.username,
+      nombreMostrar: user.nombre_mostrar,
+      cargo: user.cargo || "Sin cargo",
+    });
+
+    setSessionCookie(res, sessionId);
+    res.json({
+      message: "Sesión iniciada correctamente.",
+      user: sessions.get(sessionId).user,
+    });
+  } catch (error) {
+    handleDatabaseError(res, error, "No se pudo iniciar sesión.");
+  }
+});
+
+app.post("/api/auth/logout", (req, res) => {
+  const sessionData = getSessionFromRequest(req);
+
+  if (sessionData) {
+    sessions.delete(sessionData.sessionId);
+  }
+
+  clearSessionCookie(res);
+  res.json({ message: "Sesión cerrada correctamente." });
+});
+
+app.get("/api/auth/me", (req, res) => {
+  const sessionData = getSessionFromRequest(req);
+
+  if (!sessionData) {
+    return res.status(401).json({
+      error: "No hay una sesión activa.",
+    });
+  }
+
+  setSessionCookie(res, sessionData.sessionId);
+  return res.json({ user: sessionData.session.user });
+});
+
+app.use("/api", requireAuth);
+
 app.get("/api/options", async (req, res) => {
   try {
     const options = await getOptions();
@@ -529,6 +741,43 @@ app.get("/api/reports/overview", async (req, res) => {
     res.json(report);
   } catch (error) {
     handleDatabaseError(res, error, "No se pudo cargar el reporte ejecutivo.");
+  }
+});
+
+app.get("/api/reports/overview/pdf", async (req, res) => {
+  try {
+    const report = await getOverviewReport();
+    const lines = [
+      "Reporte ejecutivo - Store Inventory and Sales",
+      `Generado por: ${req.user.nombreMostrar}`,
+      `Fecha: ${new Date().toLocaleString("es-GT")}`,
+      "",
+      `Productos activos: ${report.metrics.total_productos}`,
+      `Clientes registrados: ${report.metrics.total_clientes}`,
+      `Unidades en stock: ${report.metrics.unidades_en_stock}`,
+      `Ventas del mes: Q${report.metrics.ventas_mes_actual}`,
+      "",
+      "Top categorias por ingresos:",
+      ...report.topCategories.map(
+        (item, index) => `${index + 1}. ${item.categoria} - Q${item.ingresos}`
+      ),
+      "",
+      "Ventas recientes:",
+      ...report.recentSales.map(
+        (sale) => `Venta #${sale.id_venta} - ${sale.fecha} - ${sale.cliente} - Q${sale.total_venta}`
+      ),
+    ];
+
+    const pdfBuffer = buildPdf(lines);
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="reporte-ejecutivo-tienda.pdf"'
+    );
+    res.send(pdfBuffer);
+  } catch (error) {
+    handleDatabaseError(res, error, "No se pudo exportar el reporte a PDF.");
   }
 });
 
