@@ -64,3 +64,18 @@ CREATE TABLE detalle_venta (
     FOREIGN KEY (id_venta) REFERENCES venta(id_venta),
     FOREIGN KEY (id_producto) REFERENCES producto(id_producto)
 );
+
+-- VIEW PARA LA UI DE RESUMEN DE VENTAS
+CREATE OR REPLACE VIEW vista_resumen_ventas AS
+SELECT
+    v.id_venta,
+    v.fecha,
+    c.nombre || ' ' || c.apellido AS cliente,
+    e.nombre || ' ' || e.apellido AS empleado,
+    COUNT(dv.id_detalle) AS lineas,
+    SUM(dv.cantidad * dv.precio_unitario) AS total_venta
+FROM venta v
+JOIN cliente c ON c.id_cliente = v.id_cliente
+JOIN empleado e ON e.id_empleado = v.id_empleado
+JOIN detalle_venta dv ON dv.id_venta = v.id_venta
+GROUP BY v.id_venta, v.fecha, c.nombre, c.apellido, e.nombre, e.apellido;
