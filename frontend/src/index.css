@@ -1,22 +1,26 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
 :root {
-  --page-bg: #f4ede2;
-  --page-bg-deep: #ead9c8;
-  --panel: rgba(255, 251, 245, 0.92);
-  --line: rgba(80, 70, 60, 0.12);
-  --ink: #3a322c;
-  --ink-strong: #201917;
-  --muted: #70665d;
-  --accent: #126b63;
-  --accent-deep: #0b4d47;
-  --burnt: #9a5628;
-  --panel-shadow: 0 22px 40px rgba(52, 42, 33, 0.08);
-  --body-font: 'Segoe UI', 'Trebuchet MS', sans-serif;
-  --heading-font: Georgia, 'Times New Roman', serif;
+  --page-bg: #13111c;
+  --card: #1e1b2e;
+  --sidebar: #17152a;
+  --line: rgba(241, 245, 249, 0.1);
+  --line-strong: rgba(168, 85, 247, 0.28);
+  --text: #f1f5f9;
+  --ink: #f1f5f9;
+  --ink-strong: #ffffff;
+  --muted: #a8a4c2;
+  --accent: #7c3aed;
+  --accent-deep: #a855f7;
+  --badge-bg: rgba(124, 58, 237, 0.15);
+  --danger: #fb7185;
+  --danger-bg: rgba(251, 113, 133, 0.13);
+  --panel-shadow: 0 22px 60px rgba(0, 0, 0, 0.34);
+  --body-font: 'Inter', 'Segoe UI', Arial, sans-serif;
+  --heading-font: 'Inter', 'Segoe UI', Arial, sans-serif;
   --mono-font: 'Cascadia Code', Consolas, monospace;
-  color: var(--ink);
-  background:
-    radial-gradient(circle at top, rgba(18, 107, 99, 0.12), transparent 26%),
-    linear-gradient(180deg, var(--page-bg) 0%, var(--page-bg-deep) 100%);
+  color: var(--text);
+  background: var(--page-bg);
   font-family: var(--body-font);
   line-height: 1.5;
   font-weight: 400;
@@ -38,6 +42,8 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  color: var(--text);
+  background: var(--page-bg);
 }
 
 body,
@@ -51,7 +57,7 @@ code {
   font-family: var(--mono-font);
   padding: 2px 6px;
   border-radius: 8px;
-  background: rgba(18, 107, 99, 0.08);
+  background: var(--badge-bg);
   color: var(--accent-deep);
 }
 
@@ -68,16 +74,29 @@ h2 {
   color: var(--ink-strong);
   font-family: var(--heading-font);
   line-height: 1.08;
+  letter-spacing: 0;
 }
 
 h1 {
-  font-size: clamp(2.4rem, 4vw, 4.8rem);
+  font-size: 3.15rem;
+  font-weight: 800;
 }
 
 h2 {
-  font-size: clamp(1.35rem, 2.1vw, 1.95rem);
+  font-size: 1.75rem;
+  font-weight: 800;
 }
 
 p {
   margin: 0;
+}
+
+@media (max-width: 760px) {
+  h1 {
+    font-size: 2.25rem;
+  }
+
+  h2 {
+    font-size: 1.45rem;
+  }
 }
