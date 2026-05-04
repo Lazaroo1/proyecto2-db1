@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react'
 import './App.css'
 
 const API_BASE = 'http://localhost:3000'
-const GTQ_FORMATTER = new Intl.NumberFormat('es-GT', {
+const USD_FORMATTER = new Intl.NumberFormat('en-US', {
   style: 'currency',
-  currency: 'GTQ',
+  currency: 'USD',
   minimumFractionDigits: 2,
 })
 
@@ -43,7 +43,7 @@ function formatCurrency(value) {
     return value
   }
 
-  return GTQ_FORMATTER.format(number)
+  return USD_FORMATTER.format(number)
 }
 
 function formatCellValue(columnKey, value) {
@@ -718,9 +718,9 @@ function App() {
       <header className="hero-panel">
         <div className="hero-copy">
           <p className="eyebrow">Proyecto 2 DB1 - Lázaro Díaz 24713</p>
-          <h1>Inventario, ventas y reportes exportables</h1>
+          <h1>OmniMarket</h1>
           <p className="hero-text">
-            Esta interfaz incluye autenticación con login/logout y sesion, exportacion del
+            Esta interfaz incluye Inventario, ventas y reportes exportables, autenticación con login/logout y sesion, exportacion del
             reporte ejecutivo a PDF, CRUD de clientes y productos, y el dashboard SQL completo.
           </p>
         </div>
