@@ -1,4 +1,4 @@
-# OmniMarket— Proyecto 2 DB1
+# OmniMarket — Proyecto 2 DB1
 
 Sistema web para gestionar inventario y ventas de una tienda de retail general, desarrollado para el curso de Bases de Datos 1.
 
