@@ -153,3 +153,150 @@ GROUP BY v.id_venta, v.fecha, c.nombre, c.apellido, e.nombre, e.apellido;
 CREATE INDEX idx_producto_id_categoria ON producto(id_categoria);
 CREATE INDEX idx_venta_fecha ON venta(fecha);
 CREATE INDEX idx_detalle_venta_id_venta ON detalle_venta(id_venta);
+
+-- PROCEDIMIENTOS ALMACENADOS
+CREATE OR REPLACE PROCEDURE sp_registrar_venta(
+    p_cliente_id INT,
+    p_empleado_id INT,
+    p_producto_id INT,
+    p_cantidad INT,
+    OUT p_venta_id INT,
+    OUT p_stock_restante INT
+)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_precio_unitario DECIMAL(10,2);
+    v_stock_actual INT;
+BEGIN
+    SELECT precio, stock
+    INTO v_precio_unitario, v_stock_actual
+    FROM producto
+    WHERE id_producto = p_producto_id
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Producto no encontrado';
+    END IF;
+
+    IF p_cantidad <= 0 THEN
+        RAISE EXCEPTION 'La cantidad debe ser mayor a cero';
+    END IF;
+
+    IF v_stock_actual < p_cantidad THEN
+        RAISE EXCEPTION 'Stock insuficiente';
+    END IF;
+
+    INSERT INTO venta (id_cliente, id_empleado)
+    VALUES (p_cliente_id, p_empleado_id)
+    RETURNING id_venta INTO p_venta_id;
+
+    INSERT INTO detalle_venta (id_venta, id_producto, cantidad, precio_unitario)
+    VALUES (p_venta_id, p_producto_id, p_cantidad, v_precio_unitario);
+
+    UPDATE producto
+    SET stock = stock - p_cantidad
+    WHERE id_producto = p_producto_id
+    RETURNING stock INTO p_stock_restante;
+EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RAISE;
+END;
+$$;
+
+CREATE OR REPLACE PROCEDURE sp_crear_producto(
+    p_nombre VARCHAR,
+    p_precio DECIMAL,
+    p_stock INT,
+    p_id_categoria INT,
+    p_id_proveedor INT,
+    OUT p_id_producto INT
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    IF p_precio <= 0 THEN
+        RAISE EXCEPTION 'El precio debe ser mayor a cero';
+    END IF;
+
+    IF p_stock < 0 THEN
+        RAISE EXCEPTION 'El stock no puede ser negativo';
+    END IF;
+
+    INSERT INTO producto (nombre, precio, stock, id_categoria, id_proveedor)
+    VALUES (p_nombre, p_precio, p_stock, p_id_categoria, p_id_proveedor)
+    RETURNING id_producto INTO p_id_producto;
+END;
+$$;
+
+CREATE OR REPLACE PROCEDURE sp_actualizar_stock(
+    p_id_producto INT,
+    p_nuevo_stock INT
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    IF p_nuevo_stock < 0 THEN
+        RAISE EXCEPTION 'El stock no puede ser negativo';
+    END IF;
+
+    UPDATE producto
+    SET stock = p_nuevo_stock
+    WHERE id_producto = p_id_producto;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Producto no encontrado';
+    END IF;
+END;
+$$;
+
+CREATE OR REPLACE PROCEDURE sp_crear_cliente(
+    p_nombre VARCHAR,
+    p_apellido VARCHAR,
+    p_email VARCHAR,
+    p_telefono VARCHAR,
+    OUT p_id_cliente INT
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    IF p_email IS NULL OR BTRIM(p_email) = '' THEN
+        RAISE EXCEPTION 'El email es obligatorio';
+    END IF;
+
+    INSERT INTO cliente (nombre, apellido, email, telefono)
+    VALUES (p_nombre, p_apellido, p_email, p_telefono)
+    RETURNING id_cliente INTO p_id_cliente;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION sp_reporte_ventas_mes(
+    p_year INT,
+    p_month INT
+)
+RETURNS TABLE (
+    cliente TEXT,
+    empleado TEXT,
+    total_venta DECIMAL,
+    fecha DATE
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        c.nombre || ' ' || COALESCE(c.apellido, '') AS cliente,
+        e.nombre || ' ' || COALESCE(e.apellido, '') AS empleado,
+        SUM(dv.cantidad * dv.precio_unitario)::DECIMAL AS total_venta,
+        v.fecha::DATE AS fecha
+    FROM venta v
+    JOIN detalle_venta dv ON dv.id_venta = v.id_venta
+    JOIN cliente c ON c.id_cliente = v.id_cliente
+    JOIN empleado e ON e.id_empleado = v.id_empleado
+    WHERE EXTRACT(YEAR FROM v.fecha) = p_year
+      AND EXTRACT(MONTH FROM v.fecha) = p_month
+    GROUP BY v.id_venta, v.fecha, c.nombre, c.apellido, e.nombre, e.apellido
+    ORDER BY v.fecha, v.id_venta;
+END;
+$$;
