@@ -1,4 +1,4 @@
-# OmniMarket — Proyecto 2 DB1
+# OmniMarket — Proyecto 3 DB1
 
 Sistema web para gestionar inventario y ventas de una tienda de retail general, desarrollado para el curso de Bases de Datos 1.
 
@@ -39,7 +39,7 @@ docker compose up --build
 
 ### Reinicio completo (borra la base de datos)
 
-Usar este comando si se modificó `db/init.sql` o `db/data.sql`:
+Usar este comando si se modificó `db/init.sql`, los procedimientos almacenados definidos allí o `db/data.sql`:
 
 ```bash
 docker compose down -v
@@ -53,7 +53,7 @@ docker compose up --build
 El proyecto usa las credenciales requeridas por la rúbrica. El archivo `.env.example` incluido contiene:
 
 ```env
-DB_USER=proy2
+DB_USER=proy3
 DB_PASSWORD=secret
 DB_NAME=tienda
 DB_HOST=db
@@ -61,7 +61,7 @@ DB_PORT=5432
 PORT=3000
 ```
 
-> **Nota:** Las credenciales `proy2` / `secret` están fijadas según los requisitos del proyecto.
+> **Nota:** Las credenciales `proy3` / `secret` están fijadas según los requisitos del proyecto.
 
 ---
 
@@ -84,6 +84,8 @@ La aplicación incluye autenticación con sesión basada en **cookie HttpOnly**.
 | `admin` | `tienda2026` | Administrador general |
 | `ventas` | `tienda2026` | Supervisor de ventas |
 | `inventario` | `tienda2026` | Coordinación de inventario |
+| `cajero` | `tienda2026` | Cajero de prueba |
+| `reportes` | `tienda2026` | Analista de reportes |
 
 ---
 
@@ -113,6 +115,13 @@ La aplicación incluye autenticación con sesión basada en **cookie HttpOnly**.
 ---
 
 ## Funcionalidades
+
+### Proyecto 3 — Nuevas funcionalidades
+
+- Prisma ORM configurado junto al `pg Pool` existente.
+- 5 stored procedures/funciones PL/pgSQL para ventas, productos, clientes, stock y reportes mensuales.
+- 5 roles de base de datos: `rol_admin`, `rol_ventas`, `rol_inventario`, `rol_cajero`, `rol_reportes`.
+- Interfaz con visibilidad por rol para reportes, clientes, productos, ventas y acciones de eliminación.
 
 ### CRUD de entidades
 
