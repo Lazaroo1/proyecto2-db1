@@ -147,6 +147,8 @@ function App() {
   const [clientFeedback, setClientFeedback] = useState(null)
   const [productFeedback, setProductFeedback] = useState(null)
 
+  const can = (allowedRoles) => allowedRoles.includes(user?.rol)
+
   async function loadAppData(showLoader = true) {
     if (showLoader) {
       setLoading(true)
@@ -701,12 +703,13 @@ function App() {
           <div className="demo-credentials">
             <h3>Credenciales de prueba</h3>
             <p>
-              <strong>Usuario:</strong> <code>admin</code>
+              <strong>Usuarios:</strong>{' '}
+              <code>admin</code>, <code>ventas</code>, <code>inventario</code>,{' '}
+              <code>cajero</code>, <code>reportes</code>
             </p>
             <p>
               <strong>Contraseña:</strong> <code>tienda2026</code>
             </p>
-            <p className="hint">También funcionan: "ventas" e "inventario" con la misma contraseña</p>
           </div>
         </article>
       </div>
@@ -750,6 +753,7 @@ function App() {
         </div>
       </header>
 
+      {can(['rol_admin', 'rol_reportes', 'rol_ventas']) ? (
       <section className="report-panel">
         <div className="section-heading report-heading">
           <div>
@@ -804,8 +808,11 @@ function App() {
           </article>
         </div>
       </section>
+      ) : null}
 
+      {can(['rol_admin', 'rol_ventas']) || can(['rol_admin', 'rol_inventario']) ? (
       <section className="crud-grid">
+        {can(['rol_admin', 'rol_ventas']) ? (
         <article className="management-card">
           <div className="section-heading">
             <span className="pill pill-crud">CRUD</span>
@@ -903,13 +910,15 @@ function App() {
                         <button className="mini-btn" type="button" onClick={() => startEditingClient(client)}>
                           Editar
                         </button>
-                        <button
-                          className="mini-btn danger"
-                          type="button"
-                          onClick={() => handleDeleteClient(client)}
-                        >
-                          Eliminar
-                        </button>
+                        {can(['rol_admin']) ? (
+                          <button
+                            className="mini-btn danger"
+                            type="button"
+                            onClick={() => handleDeleteClient(client)}
+                          >
+                            Eliminar
+                          </button>
+                        ) : null}
                       </div>
                     </td>
                   </tr>
@@ -918,7 +927,9 @@ function App() {
             </table>
           </div>
         </article>
+        ) : null}
 
+        {can(['rol_admin', 'rol_inventario']) ? (
         <article className="management-card">
           <div className="section-heading">
             <span className="pill pill-crud">CRUD</span>
@@ -1044,13 +1055,15 @@ function App() {
                         <button className="mini-btn" type="button" onClick={() => startEditingProduct(product)}>
                           Editar
                         </button>
-                        <button
-                          className="mini-btn danger"
-                          type="button"
-                          onClick={() => handleDeleteProduct(product)}
-                        >
-                          Eliminar
-                        </button>
+                        {can(['rol_admin']) ? (
+                          <button
+                            className="mini-btn danger"
+                            type="button"
+                            onClick={() => handleDeleteProduct(product)}
+                          >
+                            Eliminar
+                          </button>
+                        ) : null}
                       </div>
                     </td>
                   </tr>
@@ -1059,7 +1072,9 @@ function App() {
             </table>
           </div>
         </article>
+        ) : null}
       </section>
+      ) : null}
 
       <section className="summary-grid query-summary-grid">
         {Object.entries(categoryCount).map(([category, total]) => (
@@ -1071,6 +1086,7 @@ function App() {
         ))}
       </section>
 
+      {can(['rol_admin', 'rol_ventas', 'rol_cajero']) ? (
       <section className="transaction-panel">
         <div className="section-heading">
           <span className="pill pill-transaction">TRANSACCION</span>
@@ -1164,6 +1180,7 @@ function App() {
           </div>
         ) : null}
       </section>
+      ) : null}
 
       {error ? <div className="status-banner error">{error}</div> : null}
 
