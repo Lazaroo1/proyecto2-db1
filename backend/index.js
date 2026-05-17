@@ -809,7 +809,10 @@ app.get("/api/reports/overview/pdf", async (req, res) => {
 
 app.get("/api/clients", async (req, res) => {
   try {
-    const clients = await getClients();
+    const clients = await prisma.cliente.findMany({
+      orderBy: [{ nombre: "asc" }, { apellido: "asc" }],
+    });
+
     res.json(clients);
   } catch (error) {
     handleDatabaseError(res, error, "No se pudo cargar la lista de clientes.");
@@ -880,25 +883,20 @@ app.put("/api/clients/:id", async (req, res) => {
       throw createHttpError(400, "Debes ingresar un correo electronico valido.");
     }
 
-    const result = await pool.query(
-      `
-        UPDATE cliente
-        SET nombre = $1, apellido = $2, email = $3, telefono = $4
-        WHERE id_cliente = $5
-        RETURNING id_cliente, nombre, apellido, email, telefono;
-      `,
-      [nombre, apellido, email, telefono, id]
-    );
-
-    if (result.rowCount === 0) {
-      throw createHttpError(404, "No se encontro el cliente a editar.");
-    }
+    const client = await prisma.cliente.update({
+      where: { id_cliente: id },
+      data: { nombre, apellido, email, telefono },
+    });
 
     res.json({
       message: "Cliente actualizado correctamente.",
-      client: result.rows[0],
+      client,
     });
   } catch (error) {
+    if (error.code === "P2025") {
+      return res.status(404).json({ error: "No se encontro el cliente a editar." });
+    }
+
     handleDatabaseError(res, error, "No se pudo actualizar el cliente.");
   }
 });
@@ -911,21 +909,22 @@ app.delete("/api/clients/:id", async (req, res) => {
       throw createHttpError(400, "El cliente seleccionado no es valido.");
     }
 
-    const result = await pool.query(
-      `
-        DELETE FROM cliente
-        WHERE id_cliente = $1
-        RETURNING id_cliente;
-      `,
-      [id]
-    );
-
-    if (result.rowCount === 0) {
-      throw createHttpError(404, "No se encontro el cliente a eliminar.");
-    }
+    await prisma.cliente.delete({
+      where: { id_cliente: id },
+    });
 
     res.json({ message: "Cliente eliminado correctamente." });
   } catch (error) {
+    if (error.code === "P2003") {
+      return res.status(409).json({
+        error: "No se puede eliminar este registro porque esta siendo utilizado en otras tablas.",
+      });
+    }
+
+    if (error.code === "P2025") {
+      return res.status(404).json({ error: "No se encontro el cliente a eliminar." });
+    }
+
     handleDatabaseError(res, error, "No se pudo eliminar el cliente.");
   }
 });
