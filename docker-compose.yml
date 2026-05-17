@@ -1,7 +1,7 @@
 services:
   db:
     image: postgres:15
-    container_name: db_proyecto2
+    container_name: db_proyecto3
     restart: always
     environment:
       POSTGRES_USER: ${DB_USER}
@@ -15,7 +15,7 @@ services:
 
   backend:
     build: ./backend
-    container_name: backend_proyecto2
+    container_name: backend_proyecto3
     restart: always
     ports:
       - "3000:3000"
@@ -33,7 +33,7 @@ services:
 
   frontend:
     build: ./frontend
-    container_name: frontend_proyecto2
+    container_name: frontend_proyecto3
     ports:
       - "5173:5173"
     depends_on:
