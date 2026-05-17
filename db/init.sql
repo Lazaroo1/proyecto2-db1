@@ -155,53 +155,54 @@ CREATE INDEX idx_venta_fecha ON venta(fecha);
 CREATE INDEX idx_detalle_venta_id_venta ON detalle_venta(id_venta);
 
 -- PROCEDIMIENTOS ALMACENADOS
-CREATE OR REPLACE FUNCTION sp_registrar_venta(
+CREATE OR REPLACE PROCEDURE sp_registrar_venta(
     p_cliente_id INT,
     p_empleado_id INT,
     p_producto_id INT,
-    p_cantidad INT
-)
-RETURNS TABLE (
-    p_venta_id INT,
-    p_stock_restante INT
+    p_cantidad INT,
+    INOUT p_venta_id INT DEFAULT 0,
+    INOUT p_stock_restante INT DEFAULT 0
 )
 LANGUAGE plpgsql
 AS $$
 DECLARE
-    v_precio_unitario DECIMAL(10,2);
-    v_stock_actual INT;
+    v_stock INT;
+    v_precio DECIMAL(10,2);
 BEGIN
-    SELECT precio, stock
-    INTO v_precio_unitario, v_stock_actual
+    -- Lock the product row
+    SELECT stock, precio INTO v_stock, v_precio
     FROM producto
     WHERE id_producto = p_producto_id
     FOR UPDATE;
 
-    IF NOT FOUND THEN
-        RAISE EXCEPTION 'Producto no encontrado';
+    -- Validate stock
+    IF v_stock IS NULL THEN
+        RAISE EXCEPTION 'Producto no encontrado: %', p_producto_id;
     END IF;
 
-    IF p_cantidad <= 0 THEN
-        RAISE EXCEPTION 'La cantidad debe ser mayor a cero';
+    IF p_cantidad > v_stock THEN
+        RAISE EXCEPTION 'Stock insuficiente. Disponible: %, Solicitado: %', v_stock, p_cantidad;
     END IF;
 
-    IF v_stock_actual < p_cantidad THEN
-        RAISE EXCEPTION 'Stock insuficiente';
-    END IF;
-
-    INSERT INTO venta (id_cliente, id_empleado)
-    VALUES (p_cliente_id, p_empleado_id)
+    -- Insert venta
+    INSERT INTO venta (fecha, id_cliente, id_empleado)
+    VALUES (CURRENT_TIMESTAMP, p_cliente_id, p_empleado_id)
     RETURNING id_venta INTO p_venta_id;
 
+    -- Insert detalle_venta
     INSERT INTO detalle_venta (id_venta, id_producto, cantidad, precio_unitario)
-    VALUES (p_venta_id, p_producto_id, p_cantidad, v_precio_unitario);
+    VALUES (p_venta_id, p_producto_id, p_cantidad, v_precio);
 
+    -- Update stock
     UPDATE producto
     SET stock = stock - p_cantidad
     WHERE id_producto = p_producto_id
     RETURNING stock INTO p_stock_restante;
 
-    RETURN NEXT;
+EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RAISE;
 END;
 $$;
 

@@ -1126,16 +1126,17 @@ app.post(
     }
 
     const result = await dbClient.query(
-      "SELECT * FROM sp_registrar_venta($1, $2, $3, $4);",
+      "CALL sp_registrar_venta($1::int, $2::int, $3::int, $4::int, 0::int, 0::int)",
       [clientId, employeeId, productId, saleQuantity]
     );
-    const sale = result.rows[0];
+    const saleId = result.rows[0].p_venta_id;
+    const stockRestante = result.rows[0].p_stock_restante;
 
     res.status(201).json({
       message: "Venta registrada correctamente.",
-      saleId: sale.p_venta_id,
+      saleId,
       cantidad: saleQuantity,
-      stockRestante: sale.p_stock_restante,
+      stockRestante,
     });
   } catch (error) {
     try {
