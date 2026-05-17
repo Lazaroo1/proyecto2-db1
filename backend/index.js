@@ -746,6 +746,30 @@ app.get("/api/reports/overview", async (req, res) => {
   }
 });
 
+app.get("/api/reports/ventas-mes", async (req, res) => {
+  try {
+    const year = Number(req.query.year);
+    const month = Number(req.query.month);
+
+    if (!Number.isInteger(year) || year <= 0) {
+      throw createHttpError(400, "Debes ingresar un anio valido.");
+    }
+
+    if (!Number.isInteger(month) || month < 1 || month > 12) {
+      throw createHttpError(400, "Debes ingresar un mes valido entre 1 y 12.");
+    }
+
+    const result = await pool.query(
+      "SELECT * FROM sp_reporte_ventas_mes($1, $2);",
+      [year, month]
+    );
+
+    res.json(result.rows);
+  } catch (error) {
+    handleDatabaseError(res, error, "No se pudo cargar el reporte de ventas del mes.");
+  }
+});
+
 app.get("/api/reports/overview/pdf", async (req, res) => {
   try {
     const report = await getOverviewReport();
@@ -812,17 +836,20 @@ app.post("/api/clients", async (req, res) => {
     }
 
     const result = await pool.query(
-      `
-        INSERT INTO cliente (nombre, apellido, email, telefono)
-        VALUES ($1, $2, $3, $4)
-        RETURNING id_cliente, nombre, apellido, email, telefono;
-      `,
+      "SELECT * FROM sp_crear_cliente($1, $2, $3, $4);",
       [nombre, apellido, email, telefono]
     );
+    const { p_id_cliente: idCliente } = result.rows[0];
 
     res.status(201).json({
       message: "Cliente creado correctamente.",
-      client: result.rows[0],
+      client: {
+        id_cliente: idCliente,
+        nombre,
+        apellido,
+        email,
+        telefono,
+      },
     });
   } catch (error) {
     handleDatabaseError(res, error, "No se pudo crear el cliente.");
@@ -933,16 +960,13 @@ app.post("/api/products", async (req, res) => {
     }
 
     const result = await pool.query(
-      `
-        INSERT INTO producto (nombre, precio, stock, id_categoria, id_proveedor)
-        VALUES ($1, $2, $3, $4, $5)
-        RETURNING id_producto;
-      `,
+      "SELECT * FROM sp_crear_producto($1, $2, $3, $4, $5);",
       [nombre, precio, stock, idCategoria, idProveedor]
     );
+    const { p_id_producto: idProducto } = result.rows[0];
 
     const products = await getProducts();
-    const product = products.find((item) => item.id_producto === result.rows[0].id_producto);
+    const product = products.find((item) => item.id_producto === idProducto);
 
     res.status(201).json({
       message: "Producto creado correctamente.",
@@ -950,6 +974,30 @@ app.post("/api/products", async (req, res) => {
     });
   } catch (error) {
     handleDatabaseError(res, error, "No se pudo crear el producto.");
+  }
+});
+
+app.put("/api/products/:id/stock", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const newStockValue = req.body.newStock ?? req.body.stock;
+    const newStock = parseNonNegativeInteger(newStockValue, "El nuevo stock");
+
+    if (!Number.isInteger(id) || id <= 0) {
+      throw createHttpError(400, "El producto seleccionado no es valido.");
+    }
+
+    await pool.query("SELECT sp_actualizar_stock($1, $2);", [id, newStock]);
+
+    const products = await getProducts();
+    const product = products.find((item) => item.id_producto === id);
+
+    res.json({
+      message: "Stock actualizado correctamente.",
+      product,
+    });
+  } catch (error) {
+    handleDatabaseError(res, error, "No se pudo actualizar el stock.");
   }
 });
 
@@ -1045,68 +1093,17 @@ app.post("/api/transactions/sales", async (req, res) => {
       throw createHttpError(400, "La cantidad debe ser un entero mayor a cero.");
     }
 
-    await dbClient.query("BEGIN");
-
-    const productResult = await dbClient.query(
-      `
-        SELECT id_producto, nombre, precio, stock
-        FROM producto
-        WHERE id_producto = $1
-        FOR UPDATE;
-      `,
-      [productId]
+    const result = await dbClient.query(
+      "SELECT * FROM sp_registrar_venta($1, $2, $3, $4);",
+      [clientId, employeeId, productId, saleQuantity]
     );
-
-    if (productResult.rowCount === 0) {
-      throw createHttpError(404, "El producto seleccionado no existe.");
-    }
-
-    const product = productResult.rows[0];
-
-    if (saleQuantity > Number(product.stock)) {
-      throw createHttpError(
-        400,
-        `Stock insuficiente. Solo hay ${product.stock} unidades disponibles.`
-      );
-    }
-
-    const saleResult = await dbClient.query(
-      `
-        INSERT INTO venta (fecha, id_cliente, id_empleado)
-        VALUES (CURRENT_TIMESTAMP, $1, $2)
-        RETURNING id_venta, fecha;
-      `,
-      [clientId, employeeId]
-    );
-
-    await dbClient.query(
-      `
-        INSERT INTO detalle_venta (id_venta, id_producto, cantidad, precio_unitario)
-        VALUES ($1, $2, $3, $4);
-      `,
-      [saleResult.rows[0].id_venta, productId, saleQuantity, product.precio]
-    );
-
-    const stockResult = await dbClient.query(
-      `
-        UPDATE producto
-        SET stock = stock - $1
-        WHERE id_producto = $2
-        RETURNING stock;
-      `,
-      [saleQuantity, productId]
-    );
-
-    await dbClient.query("COMMIT");
+    const sale = result.rows[0];
 
     res.status(201).json({
       message: "Venta registrada correctamente.",
-      saleId: saleResult.rows[0].id_venta,
-      fecha: saleResult.rows[0].fecha,
-      producto: product.nombre,
+      saleId: sale.p_venta_id,
       cantidad: saleQuantity,
-      total: Number(product.precio) * saleQuantity,
-      stockRestante: stockResult.rows[0].stock,
+      stockRestante: sale.p_stock_restante,
     });
   } catch (error) {
     try {

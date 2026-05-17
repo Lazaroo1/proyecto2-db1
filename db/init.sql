@@ -155,13 +155,15 @@ CREATE INDEX idx_venta_fecha ON venta(fecha);
 CREATE INDEX idx_detalle_venta_id_venta ON detalle_venta(id_venta);
 
 -- PROCEDIMIENTOS ALMACENADOS
-CREATE OR REPLACE PROCEDURE sp_registrar_venta(
+CREATE OR REPLACE FUNCTION sp_registrar_venta(
     p_cliente_id INT,
     p_empleado_id INT,
     p_producto_id INT,
-    p_cantidad INT,
-    OUT p_venta_id INT,
-    OUT p_stock_restante INT
+    p_cantidad INT
+)
+RETURNS TABLE (
+    p_venta_id INT,
+    p_stock_restante INT
 )
 LANGUAGE plpgsql
 AS $$
@@ -198,20 +200,20 @@ BEGIN
     SET stock = stock - p_cantidad
     WHERE id_producto = p_producto_id
     RETURNING stock INTO p_stock_restante;
-EXCEPTION
-    WHEN OTHERS THEN
-        ROLLBACK;
-        RAISE;
+
+    RETURN NEXT;
 END;
 $$;
 
-CREATE OR REPLACE PROCEDURE sp_crear_producto(
+CREATE OR REPLACE FUNCTION sp_crear_producto(
     p_nombre VARCHAR,
     p_precio DECIMAL,
     p_stock INT,
     p_id_categoria INT,
-    p_id_proveedor INT,
-    OUT p_id_producto INT
+    p_id_proveedor INT
+)
+RETURNS TABLE (
+    p_id_producto INT
 )
 LANGUAGE plpgsql
 AS $$
@@ -227,13 +229,16 @@ BEGIN
     INSERT INTO producto (nombre, precio, stock, id_categoria, id_proveedor)
     VALUES (p_nombre, p_precio, p_stock, p_id_categoria, p_id_proveedor)
     RETURNING id_producto INTO p_id_producto;
+
+    RETURN NEXT;
 END;
 $$;
 
-CREATE OR REPLACE PROCEDURE sp_actualizar_stock(
+CREATE OR REPLACE FUNCTION sp_actualizar_stock(
     p_id_producto INT,
     p_nuevo_stock INT
 )
+RETURNS VOID
 LANGUAGE plpgsql
 AS $$
 BEGIN
@@ -248,15 +253,19 @@ BEGIN
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Producto no encontrado';
     END IF;
+
+    RETURN;
 END;
 $$;
 
-CREATE OR REPLACE PROCEDURE sp_crear_cliente(
+CREATE OR REPLACE FUNCTION sp_crear_cliente(
     p_nombre VARCHAR,
     p_apellido VARCHAR,
     p_email VARCHAR,
-    p_telefono VARCHAR,
-    OUT p_id_cliente INT
+    p_telefono VARCHAR
+)
+RETURNS TABLE (
+    p_id_cliente INT
 )
 LANGUAGE plpgsql
 AS $$
@@ -268,6 +277,8 @@ BEGIN
     INSERT INTO cliente (nombre, apellido, email, telefono)
     VALUES (p_nombre, p_apellido, p_email, p_telefono)
     RETURNING id_cliente INTO p_id_cliente;
+
+    RETURN NEXT;
 END;
 $$;
 
