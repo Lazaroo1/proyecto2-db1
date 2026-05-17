@@ -743,10 +743,10 @@ function App() {
             <strong>{generatedAt ? new Date(generatedAt).toLocaleString('es-GT') : 'Pendiente'}</strong>
           </div>
           <div className="top-actions">
-            <button className="secondary-btn" type="button" onClick={() => loadAppData()}>
+            <button className="primary-btn" type="button" onClick={() => loadAppData()}>
               Recargar aplicacion
             </button>
-            <button className="ghost-btn" disabled={loggingOut} type="button" onClick={handleLogout}>
+            <button className="ghost-btn danger-btn" disabled={loggingOut} type="button" onClick={handleLogout}>
               {loggingOut ? 'Saliendo...' : 'Cerrar sesión'}
             </button>
           </div>
