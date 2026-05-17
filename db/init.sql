@@ -50,6 +50,7 @@ CREATE TABLE usuario (
     username VARCHAR(50) NOT NULL UNIQUE,
     password_hash VARCHAR(64) NOT NULL,
     nombre_mostrar VARCHAR(120) NOT NULL,
+    rol VARCHAR(30) NOT NULL DEFAULT 'rol_reportes',
     id_empleado INT,
     FOREIGN KEY (id_empleado) REFERENCES empleado(id_empleado)
 );
@@ -74,6 +75,64 @@ CREATE TABLE detalle_venta (
     FOREIGN KEY (id_venta) REFERENCES venta(id_venta),
     FOREIGN KEY (id_producto) REFERENCES producto(id_producto)
 );
+
+-- ROLES DE BASE DE DATOS
+CREATE ROLE rol_admin;
+CREATE ROLE rol_ventas;
+CREATE ROLE rol_inventario;
+CREATE ROLE rol_cajero;
+CREATE ROLE rol_reportes;
+
+-- PERMISOS: ADMIN
+GRANT ALL ON TABLE categoria TO rol_admin;
+GRANT ALL ON TABLE proveedor TO rol_admin;
+GRANT ALL ON TABLE producto TO rol_admin;
+GRANT ALL ON TABLE cliente TO rol_admin;
+GRANT ALL ON TABLE empleado TO rol_admin;
+GRANT ALL ON TABLE usuario TO rol_admin;
+GRANT ALL ON TABLE venta TO rol_admin;
+GRANT ALL ON TABLE detalle_venta TO rol_admin;
+-- GRANT EXECUTE ON PROCEDURE ... TO rol_admin;
+
+-- PERMISOS: VENTAS
+REVOKE ALL ON TABLE categoria, proveedor, producto, cliente, empleado, usuario, venta, detalle_venta FROM rol_ventas;
+GRANT SELECT ON TABLE producto TO rol_ventas;
+GRANT SELECT ON TABLE categoria TO rol_ventas;
+GRANT SELECT ON TABLE proveedor TO rol_ventas;
+GRANT SELECT, INSERT ON TABLE venta TO rol_ventas;
+GRANT SELECT, INSERT ON TABLE detalle_venta TO rol_ventas;
+GRANT SELECT ON TABLE cliente TO rol_ventas;
+GRANT SELECT ON TABLE empleado TO rol_ventas;
+
+-- PERMISOS: INVENTARIO
+REVOKE ALL ON TABLE categoria, proveedor, producto, cliente, empleado, usuario, venta, detalle_venta FROM rol_inventario;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE producto TO rol_inventario;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE categoria TO rol_inventario;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE proveedor TO rol_inventario;
+GRANT SELECT ON TABLE venta TO rol_inventario;
+GRANT SELECT ON TABLE detalle_venta TO rol_inventario;
+REVOKE INSERT, UPDATE, DELETE ON TABLE venta FROM rol_inventario;
+REVOKE INSERT, UPDATE, DELETE ON TABLE detalle_venta FROM rol_inventario;
+
+-- PERMISOS: CAJERO
+REVOKE ALL ON TABLE categoria, proveedor, producto, cliente, empleado, usuario, venta, detalle_venta FROM rol_cajero;
+GRANT SELECT ON TABLE producto TO rol_cajero;
+GRANT SELECT ON TABLE cliente TO rol_cajero;
+GRANT SELECT ON TABLE empleado TO rol_cajero;
+GRANT SELECT, INSERT ON TABLE venta TO rol_cajero;
+GRANT SELECT, INSERT ON TABLE detalle_venta TO rol_cajero;
+REVOKE INSERT, UPDATE, DELETE ON TABLE producto FROM rol_cajero;
+
+-- PERMISOS: REPORTES
+REVOKE ALL ON TABLE categoria, proveedor, producto, cliente, empleado, usuario, venta, detalle_venta FROM rol_reportes;
+GRANT SELECT ON TABLE categoria TO rol_reportes;
+GRANT SELECT ON TABLE proveedor TO rol_reportes;
+GRANT SELECT ON TABLE producto TO rol_reportes;
+GRANT SELECT ON TABLE cliente TO rol_reportes;
+GRANT SELECT ON TABLE empleado TO rol_reportes;
+GRANT SELECT ON TABLE usuario TO rol_reportes;
+GRANT SELECT ON TABLE venta TO rol_reportes;
+GRANT SELECT ON TABLE detalle_venta TO rol_reportes;
 
 -- VIEW PARA LA UI DE RESUMEN DE VENTAS
 CREATE OR REPLACE VIEW vista_resumen_ventas AS

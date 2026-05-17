@@ -141,10 +141,12 @@ INSERT INTO empleado (nombre, apellido, cargo, salario) VALUES
 ('Ivan', 'Rosales', 'Prevencion de perdidas', 4700.00);
 
 -- usuario
-INSERT INTO usuario (username, password_hash, nombre_mostrar, id_empleado) VALUES
-('admin', '3e01f3708b4dda9da8b984bcd792618d6b81d88aa1182e3ba87212ada3e341c8', 'Administrador general', (SELECT id_empleado FROM empleado WHERE nombre = 'Carlos' AND apellido = 'Mendoza')),
-('ventas', '3e01f3708b4dda9da8b984bcd792618d6b81d88aa1182e3ba87212ada3e341c8', 'Supervisor de ventas', (SELECT id_empleado FROM empleado WHERE nombre = 'Jose' AND apellido = 'Ramirez')),
-('inventario', '3e01f3708b4dda9da8b984bcd792618d6b81d88aa1182e3ba87212ada3e341c8', 'Coordinacion de inventario', (SELECT id_empleado FROM empleado WHERE nombre = 'Natalia' AND apellido = 'Gomez'));
+INSERT INTO usuario (username, password_hash, nombre_mostrar, rol, id_empleado) VALUES
+('admin', '3e01f3708b4dda9da8b984bcd792618d6b81d88aa1182e3ba87212ada3e341c8', 'Administrador general', 'rol_admin', (SELECT id_empleado FROM empleado WHERE nombre = 'Carlos' AND apellido = 'Mendoza')),
+('ventas', '3e01f3708b4dda9da8b984bcd792618d6b81d88aa1182e3ba87212ada3e341c8', 'Supervisor de ventas', 'rol_ventas', (SELECT id_empleado FROM empleado WHERE nombre = 'Jose' AND apellido = 'Ramirez')),
+('inventario', '3e01f3708b4dda9da8b984bcd792618d6b81d88aa1182e3ba87212ada3e341c8', 'Coordinacion de inventario', 'rol_inventario', (SELECT id_empleado FROM empleado WHERE nombre = 'Natalia' AND apellido = 'Gomez')),
+('cajero', '3e01f3708b4dda9da8b984bcd792618d6b81d88aa1182e3ba87212ada3e341c8', 'Cajero de prueba', 'rol_cajero', (SELECT id_empleado FROM empleado WHERE nombre = 'Maria Fernanda' AND apellido = 'Cruz')),
+('reportes', '3e01f3708b4dda9da8b984bcd792618d6b81d88aa1182e3ba87212ada3e341c8', 'Analista de reportes', 'rol_reportes', (SELECT id_empleado FROM empleado WHERE nombre = 'Javier' AND apellido = 'Monzon'));
 
 -- venta
 INSERT INTO venta (fecha, id_cliente, id_empleado) VALUES
