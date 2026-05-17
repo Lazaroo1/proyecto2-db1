@@ -758,7 +758,7 @@ app.get(
 
 app.get(
   "/api/reports/overview",
-  requireRole("rol_admin", "rol_reportes", "rol_ventas", "rol_inventario", "rol_cajero"),
+  requireRole("rol_admin", "rol_reportes", "rol_ventas"),
   async (req, res) => {
   try {
     const report = await getOverviewReport();
@@ -797,7 +797,10 @@ app.get(
   }
 );
 
-app.get("/api/reports/overview/pdf", async (req, res) => {
+app.get(
+  "/api/reports/overview/pdf",
+  requireRole("rol_admin", "rol_reportes", "rol_ventas"),
+  async (req, res) => {
   try {
     const report = await getOverviewReport();
     const lines = [
@@ -832,7 +835,8 @@ app.get("/api/reports/overview/pdf", async (req, res) => {
   } catch (error) {
     handleDatabaseError(res, error, "No se pudo exportar el reporte a PDF.");
   }
-});
+  }
+);
 
 app.get("/api/clients", async (req, res) => {
   try {
