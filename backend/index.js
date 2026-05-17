@@ -398,6 +398,19 @@ function requireAuth(req, res, next) {
   return next();
 }
 
+function requireRole(...allowedRoles) {
+  return (req, res, next) =>
+    requireAuth(req, res, () => {
+      if (!allowedRoles.includes(req.user?.rol)) {
+        return res.status(403).json({
+          error: "No tienes permiso para realizar esta accion.",
+        });
+      }
+
+      return next();
+    });
+}
+
 function escapePdfText(value) {
   return String(value)
     .replace(/\\/g, "\\\\")
@@ -654,6 +667,7 @@ app.post("/api/auth/login", async (req, res) => {
           u.username,
           u.password_hash,
           u.nombre_mostrar,
+          u.rol,
           e.cargo
         FROM usuario u
         LEFT JOIN empleado e ON e.id_empleado = u.id_empleado
@@ -677,6 +691,7 @@ app.post("/api/auth/login", async (req, res) => {
       idUsuario: user.id_usuario,
       username: user.username,
       nombreMostrar: user.nombre_mostrar,
+      rol: user.rol,
       cargo: user.cargo || "Sin cargo",
     });
 
@@ -725,7 +740,10 @@ app.get("/api/options", async (req, res) => {
   }
 });
 
-app.get("/api/dashboard", async (req, res) => {
+app.get(
+  "/api/dashboard",
+  requireRole("rol_admin", "rol_reportes", "rol_ventas", "rol_inventario", "rol_cajero"),
+  async (req, res) => {
   try {
     const sections = await getDashboardSections();
     res.json({
@@ -735,18 +753,26 @@ app.get("/api/dashboard", async (req, res) => {
   } catch (error) {
     handleDatabaseError(res, error, "No se pudo cargar el dashboard SQL.");
   }
-});
+  }
+);
 
-app.get("/api/reports/overview", async (req, res) => {
+app.get(
+  "/api/reports/overview",
+  requireRole("rol_admin", "rol_reportes", "rol_ventas", "rol_inventario", "rol_cajero"),
+  async (req, res) => {
   try {
     const report = await getOverviewReport();
     res.json(report);
   } catch (error) {
     handleDatabaseError(res, error, "No se pudo cargar el reporte ejecutivo.");
   }
-});
+  }
+);
 
-app.get("/api/reports/ventas-mes", async (req, res) => {
+app.get(
+  "/api/reports/ventas-mes",
+  requireRole("rol_admin", "rol_reportes", "rol_ventas", "rol_inventario", "rol_cajero"),
+  async (req, res) => {
   try {
     const year = Number(req.query.year);
     const month = Number(req.query.month);
@@ -768,7 +794,8 @@ app.get("/api/reports/ventas-mes", async (req, res) => {
   } catch (error) {
     handleDatabaseError(res, error, "No se pudo cargar el reporte de ventas del mes.");
   }
-});
+  }
+);
 
 app.get("/api/reports/overview/pdf", async (req, res) => {
   try {
@@ -819,7 +846,7 @@ app.get("/api/clients", async (req, res) => {
   }
 });
 
-app.post("/api/clients", async (req, res) => {
+app.post("/api/clients", requireRole("rol_admin", "rol_ventas"), async (req, res) => {
   try {
     const nombre = normalizeText(req.body.nombre);
     const apellido = normalizeText(req.body.apellido);
@@ -859,7 +886,7 @@ app.post("/api/clients", async (req, res) => {
   }
 });
 
-app.put("/api/clients/:id", async (req, res) => {
+app.put("/api/clients/:id", requireRole("rol_admin", "rol_ventas"), async (req, res) => {
   try {
     const id = Number(req.params.id);
     const nombre = normalizeText(req.body.nombre);
@@ -901,7 +928,7 @@ app.put("/api/clients/:id", async (req, res) => {
   }
 });
 
-app.delete("/api/clients/:id", async (req, res) => {
+app.delete("/api/clients/:id", requireRole("rol_admin"), async (req, res) => {
   try {
     const id = Number(req.params.id);
 
@@ -938,7 +965,7 @@ app.get("/api/products", async (req, res) => {
   }
 });
 
-app.post("/api/products", async (req, res) => {
+app.post("/api/products", requireRole("rol_admin", "rol_inventario"), async (req, res) => {
   try {
     const nombre = normalizeText(req.body.nombre);
     const precio = parsePositiveNumber(req.body.precio, "El precio");
@@ -976,7 +1003,10 @@ app.post("/api/products", async (req, res) => {
   }
 });
 
-app.put("/api/products/:id/stock", async (req, res) => {
+app.put(
+  "/api/products/:id/stock",
+  requireRole("rol_admin", "rol_inventario"),
+  async (req, res) => {
   try {
     const id = Number(req.params.id);
     const newStockValue = req.body.newStock ?? req.body.stock;
@@ -1000,7 +1030,7 @@ app.put("/api/products/:id/stock", async (req, res) => {
   }
 });
 
-app.put("/api/products/:id", async (req, res) => {
+app.put("/api/products/:id", requireRole("rol_admin", "rol_inventario"), async (req, res) => {
   try {
     const id = Number(req.params.id);
     const nombre = normalizeText(req.body.nombre);
@@ -1051,7 +1081,7 @@ app.put("/api/products/:id", async (req, res) => {
   }
 });
 
-app.delete("/api/products/:id", async (req, res) => {
+app.delete("/api/products/:id", requireRole("rol_admin"), async (req, res) => {
   try {
     const id = Number(req.params.id);
 
@@ -1078,7 +1108,10 @@ app.delete("/api/products/:id", async (req, res) => {
   }
 });
 
-app.post("/api/transactions/sales", async (req, res) => {
+app.post(
+  "/api/transactions/sales",
+  requireRole("rol_admin", "rol_ventas", "rol_cajero"),
+  async (req, res) => {
   const { clientId, employeeId, productId, quantity } = req.body;
   const saleQuantity = Number(quantity);
   const dbClient = await pool.connect();
