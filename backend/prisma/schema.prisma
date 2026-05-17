@@ -1,0 +1,101 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Categoria {
+  id_categoria Int        @id @default(autoincrement())
+  nombre       String     @db.VarChar(100)
+  descripcion  String?    @db.Text
+  productos    Producto[]
+
+  @@map("categoria")
+}
+
+model Proveedor {
+  id_proveedor Int        @id @default(autoincrement())
+  nombre       String     @db.VarChar(100)
+  telefono     String?    @db.VarChar(20)
+  email        String?    @db.VarChar(100)
+  direccion    String?    @db.Text
+  productos    Producto[]
+
+  @@map("proveedor")
+}
+
+model Producto {
+  id_producto  Int            @id @default(autoincrement())
+  nombre       String         @db.VarChar(100)
+  precio       Decimal        @db.Decimal(10, 2)
+  stock        Int
+  id_categoria Int
+  id_proveedor Int
+  categoria    Categoria      @relation(fields: [id_categoria], references: [id_categoria])
+  proveedor    Proveedor      @relation(fields: [id_proveedor], references: [id_proveedor])
+  detalles     DetalleVenta[]
+
+  @@map("producto")
+}
+
+model Cliente {
+  id_cliente Int     @id @default(autoincrement())
+  nombre     String  @db.VarChar(100)
+  apellido   String? @db.VarChar(100)
+  email      String? @db.VarChar(100)
+  telefono   String? @db.VarChar(20)
+  ventas     Venta[]
+
+  @@map("cliente")
+}
+
+model Empleado {
+  id_empleado Int       @id @default(autoincrement())
+  nombre      String    @db.VarChar(100)
+  apellido    String?   @db.VarChar(100)
+  cargo       String?   @db.VarChar(50)
+  salario     Decimal?  @db.Decimal(10, 2)
+  ventas      Venta[]
+  usuarios    Usuario[]
+
+  @@map("empleado")
+}
+
+model Usuario {
+  id_usuario     Int       @id @default(autoincrement())
+  username       String    @unique @db.VarChar(50)
+  password_hash  String    @db.VarChar(64)
+  nombre_mostrar String    @db.VarChar(120)
+  rol            String    @default("rol_reportes") @db.VarChar(30)
+  id_empleado    Int?
+  empleado       Empleado? @relation(fields: [id_empleado], references: [id_empleado])
+
+  @@map("usuario")
+}
+
+model Venta {
+  id_venta    Int            @id @default(autoincrement())
+  fecha       DateTime       @default(now()) @db.Timestamp(6)
+  id_cliente  Int
+  id_empleado Int
+  cliente     Cliente        @relation(fields: [id_cliente], references: [id_cliente])
+  empleado    Empleado       @relation(fields: [id_empleado], references: [id_empleado])
+  detalles    DetalleVenta[]
+
+  @@map("venta")
+}
+
+model DetalleVenta {
+  id_detalle      Int      @id @default(autoincrement())
+  id_venta        Int
+  id_producto     Int
+  cantidad        Int
+  precio_unitario Decimal  @db.Decimal(10, 2)
+  venta           Venta    @relation(fields: [id_venta], references: [id_venta])
+  producto        Producto @relation(fields: [id_producto], references: [id_producto])
+
+  @@map("detalle_venta")
+}
